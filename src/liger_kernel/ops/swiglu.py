@@ -2,7 +2,7 @@ import torch
 import triton
 import triton.language as tl
 
-from liger_kernel.ops.utils import calculate_settings, ensure_contiguous
+from liger_kernel.ops.utils import calculate_settings, ensure_contiguous, is_hip
 
 
 @triton.jit
@@ -10,6 +10,53 @@ def silu(x):
     return x * tl.sigmoid(x)
 
 
+def get_amd_triton_config_list():
+
+    waves_per_eu = [2]
+    matrix_instr_nonkdim = [16]
+    num_stages = [1]
+    num_warps = [16]
+
+    # waves_per_eu = [0, 1, 2]
+    # matrix_instr_nonkdim = [16, 32]
+    # num_stages=[0, 1, 2]
+    # num_warps=[4, 8, 16]
+
+    config_list = []
+
+    for wpe in waves_per_eu:
+        for kdim in matrix_instr_nonkdim:
+            for ns in num_stages:
+                for nw in num_warps:
+                    config_list.append(
+                        triton.Config(
+                            {
+                                "waves_per_eu": wpe,
+                                "matrix_instr_nonkdim": kdim,
+                            },
+                            num_stages=ns,
+                            num_warps=nw,
+                        )
+                    )
+    return config_list
+
+
+def get_nvidia_triton_config_list():
+
+    return [
+        triton.Config(
+            {},
+            num_warps=32,
+        )
+    ]
+
+
+@triton.autotune(
+    configs=(
+        get_amd_triton_config_list() if is_hip() else get_nvidia_triton_config_list()
+    ),
+    key=["BLOCK_SIZE"],
+)
 @triton.jit
 def _swiglu_forward_kernel(
     a_ptr, b_ptr, c_ptr, stride, n_cols: tl.constexpr, BLOCK_SIZE: tl.constexpr
@@ -31,6 +78,12 @@ def _swiglu_forward_kernel(
     tl.store(c_ptr + col_offsets, c_row, mask=mask)
 
 
+@triton.autotune(
+    configs=(
+        get_amd_triton_config_list() if is_hip() else get_nvidia_triton_config_list()
+    ),
+    key=["BLOCK_SIZE"],
+)
 @triton.jit
 def _swiglu_backward_kernel(
     dc_ptr, a_ptr, b_ptr, stride, n_cols: tl.constexpr, BLOCK_SIZE: tl.constexpr
@@ -78,7 +131,7 @@ def swiglu_forward(a, b):
         c.stride(-2),
         n_cols=n_cols,
         BLOCK_SIZE=BLOCK_SIZE,
-        num_warps=num_warps,
+        # num_warps=num_warps,
     )
     return a, b, c.view(*ori_shape)
 
@@ -99,7 +152,7 @@ def swiglu_backward(a, b, dc):
         dc.stride(-2),
         n_cols=n_cols,
         BLOCK_SIZE=BLOCK_SIZE,
-        num_warps=num_warps,
+        # num_warps=num_warps,
     )
     return a.view(*ori_shape), b.view(*ori_shape)
 

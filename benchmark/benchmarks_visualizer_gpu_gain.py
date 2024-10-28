@@ -106,6 +106,7 @@ def load_data(config: VisualizationsConfig) -> pd.DataFrame:
 
     return filtered_df
 
+
 def plot_data(df: pd.DataFrame, config: VisualizationsConfig):
     """Plots the benchmark data, saving the result if needed.
 
@@ -114,34 +115,44 @@ def plot_data(df: pd.DataFrame, config: VisualizationsConfig):
         config (VisualizationsConfig): Configuration object for the visualizations script.
     """
     xlabel = df["x_label"].iloc[0]
-    ylabel = f"Multiple of Liger over Hugging Face"
+    if config.metric_name == "speed":
+        ylabel = f"Speed Gain Multiplier of Liger over Hugging Face"
+    else:
+        ylabel = f"Memory Efficiency Ratio of Liger over Hugging Face"
 
     # Pivot the dataframe to have separate columns for liger and huggingface
-    df_pivot = df.pivot(index='x_value', columns='kernel_provider', values='y_value_50')
+    df_pivot = df.pivot(index="x_value", columns="kernel_provider", values="y_value_50")
 
     # Calculate the multiple of liger over huggingface
-    df_pivot['multiple'] = df_pivot['liger'] / df_pivot['huggingface']
+    if config.metric_name == "speed":
+        df_pivot["multiple"] = df_pivot["huggingface"] / df_pivot["liger"]
+    else:
+        df_pivot["multiple"] = df_pivot["liger"] / df_pivot["huggingface"]
 
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(12, 6))
     sns.set(style="whitegrid")
-    ax = sns.lineplot(
-        data=df_pivot,
-        x=df_pivot.index,
-        y='multiple',
-        marker="o",
-        color='blue',
-    )
 
-    plt.axhline(y=1, color='r', linestyle='--', label='Baseline (Hugging Face)')
+    # Create bar plot
+    ax = sns.barplot(x=df_pivot.index, y="multiple", data=df_pivot, color="skyblue")
+
+    # Add value labels on top of each bar
+    for i, v in enumerate(df_pivot["multiple"]):
+        ax.text(i, v, f"{v:.2f}", ha="center", va="bottom")
+
+    plt.axhline(y=1, color="r", linestyle="--", label="Baseline (Hugging Face)")
 
     plt.legend()
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.title(f"{config.kernel_name} - {config.metric_name} - {config.kernel_operation_mode}")
+    plt.title(
+        f"{config.kernel_name} - {config.metric_name} - {config.kernel_operation_mode}"
+    )
+    plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
 
     out_path = os.path.join(
-        VISUALIZATIONS_PATH, f"{config.kernel_name}_{config.metric_name}_{config.kernel_operation_mode}_{config.gpu_name}_multiple.png"
+        VISUALIZATIONS_PATH,
+        f"{config.kernel_name}_{config.metric_name}_{config.kernel_operation_mode}_{config.gpu_name}_multiple_gain.png",
     )
 
     if config.display:
@@ -150,6 +161,59 @@ def plot_data(df: pd.DataFrame, config: VisualizationsConfig):
         os.makedirs(VISUALIZATIONS_PATH, exist_ok=True)
         plt.savefig(out_path)
     plt.close()
+
+
+# def plot_data(df: pd.DataFrame, config: VisualizationsConfig):
+#     """Plots the benchmark data, saving the result if needed.
+
+#     Args:
+#         df (pd.DataFrame): Filtered benchmark dataframe.
+#         config (VisualizationsConfig): Configuration object for the visualizations script.
+#     """
+#     xlabel = df["x_label"].iloc[0]
+#     if config.metric_name == "speed":
+#         ylabel = f"Speed Gain Multiplier of Liger over Hugging Face"
+#     else:
+#         ylabel = f"Memory Efficiency Ratio of Liger over Hugging Face"
+
+#     # Pivot the dataframe to have separate columns for liger and huggingface
+#     df_pivot = df.pivot(index='x_value', columns='kernel_provider', values='y_value_50')
+
+#     # Calculate the multiple of liger over huggingface
+#     if config.metric_name == "speed":
+#         df_pivot['multiple'] =  df_pivot['huggingface'] / df_pivot['liger']
+#     else:
+#         df_pivot['multiple'] = df_pivot['liger'] / df_pivot['huggingface']
+
+#     plt.figure(figsize=(10, 6))
+#     sns.set(style="whitegrid")
+#     ax = sns.lineplot(
+#         data=df_pivot,
+#         x=df_pivot.index,
+#         y='multiple',
+#         marker="o",
+#         color='blue',
+#         label='Liger'
+#     )
+
+#     plt.axhline(y=1, color='r', linestyle='--', label='Baseline (Hugging Face)')
+
+#     plt.legend()
+#     plt.xlabel(xlabel)
+#     plt.ylabel(ylabel)
+#     plt.title(f"{config.kernel_name} - {config.metric_name} - {config.kernel_operation_mode}")
+#     plt.tight_layout()
+
+#     out_path = os.path.join(
+#         VISUALIZATIONS_PATH, f"{config.kernel_name}_{config.metric_name}_{config.kernel_operation_mode}_{config.gpu_name}_multiple_gain.png"
+#     )
+
+#     if config.display:
+#         plt.show()
+#     if config.overwrite or not os.path.exists(out_path):
+#         os.makedirs(VISUALIZATIONS_PATH, exist_ok=True)
+#         plt.savefig(out_path)
+#     plt.close()
 
 
 def main():

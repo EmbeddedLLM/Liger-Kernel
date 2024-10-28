@@ -2,9 +2,51 @@ import torch
 import triton
 import triton.language as tl
 
-from liger_kernel.ops.utils import ensure_contiguous
+from liger_kernel.ops.utils import ensure_contiguous, is_hip
 
 
+def get_amd_triton_config_list():
+
+    waves_per_eu = [0, 1, 2]
+    matrix_instr_nonkdim = [16, 32]
+    num_stages = [0, 1, 2]
+    num_warps = [4, 8, 16]
+
+    config_list = []
+
+    for wpe in waves_per_eu:
+        for kdim in matrix_instr_nonkdim:
+            for ns in num_stages:
+                for nw in num_warps:
+                    config_list.append(
+                        triton.Config(
+                            {
+                                "waves_per_eu": wpe,
+                                "matrix_instr_nonkdim": kdim,
+                            },
+                            num_stages=ns,
+                            num_warps=nw,
+                        )
+                    )
+    return config_list
+
+
+def get_nvidia_triton_config_list():
+
+    return [
+        triton.Config(
+            {},
+            num_warps=32,
+        )
+    ]
+
+
+@triton.autotune(
+    configs=(
+        get_amd_triton_config_list() if is_hip() else get_nvidia_triton_config_list()
+    ),
+    key=["embedding_dim", "BLOCK_SIZE_M", "BLOCK_SIZE_N"],
+)
 @triton.jit
 def embedding_forward_kernel(
     embeddings_ptr,
@@ -39,6 +81,48 @@ def embedding_forward_kernel(
     )
 
 
+def get_amd_triton_config_list():
+
+    waves_per_eu = [0, 1, 2]
+    matrix_instr_nonkdim = [16, 32]
+    num_stages = [0, 1, 2]
+    num_warps = [4, 8, 16]
+
+    config_list = []
+
+    for wpe in waves_per_eu:
+        for kdim in matrix_instr_nonkdim:
+            for ns in num_stages:
+                for nw in num_warps:
+                    config_list.append(
+                        triton.Config(
+                            {
+                                "waves_per_eu": wpe,
+                                "matrix_instr_nonkdim": kdim,
+                            },
+                            num_stages=ns,
+                            num_warps=nw,
+                        )
+                    )
+    return config_list
+
+
+def get_nvidia_triton_config_list():
+
+    return [
+        triton.Config(
+            {},
+            num_warps=32,
+        )
+    ]
+
+
+@triton.autotune(
+    configs=(
+        get_amd_triton_config_list() if is_hip() else get_nvidia_triton_config_list()
+    ),
+    key=["embedding_dim", "BLOCK_SIZE_M", "BLOCK_SIZE_N"],
+)
 @triton.jit
 def embedding_backward_kernel(
     grad_output_ptr,

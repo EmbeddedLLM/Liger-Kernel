@@ -9,6 +9,7 @@ from liger_kernel.ops.utils import (
     calculate_settings,
     compare_version,
     ensure_contiguous,
+    is_hip,
 )
 
 if compare_version("triton", operator.ge, "3.0.0"):
@@ -22,6 +23,48 @@ else:
     from triton.language.math import rsqrt
 
 
+def get_amd_triton_config_list():
+
+    waves_per_eu = [0, 1, 2]
+    matrix_instr_nonkdim = [16, 32]
+    num_stages = [0, 1, 2]
+    num_warps = [4, 8, 16]
+
+    config_list = []
+
+    for wpe in waves_per_eu:
+        for kdim in matrix_instr_nonkdim:
+            for ns in num_stages:
+                for nw in num_warps:
+                    config_list.append(
+                        triton.Config(
+                            {
+                                "waves_per_eu": wpe,
+                                "matrix_instr_nonkdim": kdim,
+                            },
+                            num_stages=ns,
+                            num_warps=nw,
+                        )
+                    )
+    return config_list
+
+
+def get_nvidia_triton_config_list():
+
+    return [
+        triton.Config(
+            {},
+            num_warps=32,
+        )
+    ]
+
+
+@triton.autotune(
+    configs=(
+        get_amd_triton_config_list() if is_hip() else get_nvidia_triton_config_list()
+    ),
+    key=["BLOCK_SIZE"],
+)
 @triton.jit
 def _layer_norm_forward_kernel(
     Y_ptr,  # pointer to output, shape (n_rows, n_cols)
@@ -70,6 +113,12 @@ def _layer_norm_forward_kernel(
     tl.store(Y_ptr + col_offsets, Y_row, mask=mask)
 
 
+@triton.autotune(
+    configs=(
+        get_amd_triton_config_list() if is_hip() else get_nvidia_triton_config_list()
+    ),
+    key=["rows_per_program", "dtype", "BLOCK_SIZE"],
+)
 @triton.jit
 def _layer_norm_backward_kernel(
     X_ptr,  # pointer to input, shape (n_rows, n_cols)
@@ -169,7 +218,7 @@ def layer_norm_forward(X, W, B, eps):
         n_cols,
         eps,
         BLOCK_SIZE=BLOCK_SIZE,
-        num_warps=num_warps,
+        # num_warps=num_warps,
     )
     return Y.view(*shape), X, Mean, RSTD, BLOCK_SIZE, num_warps
 

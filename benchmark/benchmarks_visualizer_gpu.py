@@ -155,7 +155,8 @@ def plot_data(df: pd.DataFrame, config: VisualizationsConfig):
     plt.tight_layout()
 
     out_path = os.path.join(
-        VISUALIZATIONS_PATH, f"{config.kernel_name}_{config.metric_name}_{config.kernel_operation_mode}_{config.gpu_name}.png"
+        VISUALIZATIONS_PATH,
+        f"{config.kernel_name}_{config.metric_name}_{config.kernel_operation_mode}_{config.gpu_name}.png",
     )
 
     if config.display:
