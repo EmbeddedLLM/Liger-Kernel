@@ -2,53 +2,18 @@ import torch
 import triton
 import triton.language as tl
 
-from liger_kernel.ops.utils import calculate_settings, ensure_contiguous, is_hip
+from liger_kernel.ops.utils import (
+    calculate_settings,
+    ensure_contiguous,
+    get_amd_triton_config_list,
+    get_nvidia_triton_config_list,
+    is_hip,
+)
 
 
 @triton.jit
 def silu(x):
     return x * tl.sigmoid(x)
-
-
-def get_amd_triton_config_list():
-
-    waves_per_eu = [2]
-    matrix_instr_nonkdim = [16]
-    num_stages = [1]
-    num_warps = [16]
-
-    # waves_per_eu = [0, 1, 2]
-    # matrix_instr_nonkdim = [16, 32]
-    # num_stages=[0, 1, 2]
-    # num_warps=[4, 8, 16]
-
-    config_list = []
-
-    for wpe in waves_per_eu:
-        for kdim in matrix_instr_nonkdim:
-            for ns in num_stages:
-                for nw in num_warps:
-                    config_list.append(
-                        triton.Config(
-                            {
-                                "waves_per_eu": wpe,
-                                "matrix_instr_nonkdim": kdim,
-                            },
-                            num_stages=ns,
-                            num_warps=nw,
-                        )
-                    )
-    return config_list
-
-
-def get_nvidia_triton_config_list():
-
-    return [
-        triton.Config(
-            {},
-            num_warps=32,
-        )
-    ]
 
 
 @triton.autotune(

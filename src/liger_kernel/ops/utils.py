@@ -25,6 +25,54 @@ def is_hip() -> bool:
     return torch.version.hip is not None
 
 
+def get_amd_triton_config_list():
+
+    waves_per_eu = [0, 1, 2]
+    matrix_instr_nonkdim = [16, 32]
+    num_stages = [0, 1, 2]
+    num_warps = [4, 8, 16]
+
+    config_list = []
+
+    for wpe in waves_per_eu:
+        for kdim in matrix_instr_nonkdim:
+            for ns in num_stages:
+                for nw in num_warps:
+                    config_list.append(
+                        triton.Config(
+                            {
+                                "waves_per_eu": wpe,
+                                "matrix_instr_nonkdim": kdim,
+                            },
+                            num_stages=ns,
+                            num_warps=nw,
+                        )
+                    )
+    return config_list
+
+
+def get_nvidia_triton_config_list():
+
+    return [
+        triton.Config(
+            {},
+            num_warps=4,
+        ),
+        triton.Config(
+            {},
+            num_warps=8,
+        ),
+        triton.Config(
+            {},
+            num_warps=16,
+        ),
+        triton.Config(
+            {},
+            num_warps=32,
+        ),
+    ]
+
+
 def ensure_contiguous(fn):
     @functools.wraps(fn)
     def wrapper(ctx, *args, **kwargs):
@@ -87,6 +135,12 @@ torch_to_triton_dtype = {
 }
 
 
+@triton.autotune(
+    configs=(
+        get_amd_triton_config_list() if is_hip() else get_nvidia_triton_config_list()
+    ),
+    key=["BLOCK_SIZE"],
+)
 @triton.jit
 def element_mul_kernel(
     X_ptr,

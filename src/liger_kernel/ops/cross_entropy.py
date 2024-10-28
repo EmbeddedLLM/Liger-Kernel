@@ -2,9 +2,20 @@ import torch
 import triton
 import triton.language as tl
 
-from liger_kernel.ops.utils import element_mul_kernel, is_hip
+from liger_kernel.ops.utils import (
+    element_mul_kernel,
+    get_amd_triton_config_list,
+    get_nvidia_triton_config_list,
+    is_hip,
+)
 
 
+@triton.autotune(
+    configs=(
+        get_amd_triton_config_list() if is_hip() else get_nvidia_triton_config_list()
+    ),
+    key=["BLOCK_SIZE"],
+)
 @triton.jit
 def liger_cross_entropy_kernel(
     X_ptr,
@@ -194,7 +205,7 @@ def cross_entropy_forward(_input, target, ignore_index, label_smoothing, reducti
         BLOCK_SIZE=BLOCK_SIZE,
         # TODO: 32 seems to give the best performance
         # Performance is quite sensitive to num_warps
-        num_warps=32 if not is_hip() else 16,
+        # num_warps=32 if not is_hip() else 16,
     )
 
     loss = torch.sum(loss_1d)
@@ -219,7 +230,7 @@ def cross_entropy_backward(_input, grad_output):
             grad_output,
             V,
             BLOCK_SIZE=BLOCK_SIZE,
-            num_warps=32 if not is_hip() else 16,
+            # num_warps=32 if not is_hip() else 16,
         )
 
     return _input
