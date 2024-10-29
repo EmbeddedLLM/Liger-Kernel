@@ -117,17 +117,19 @@ def plot_data(df: pd.DataFrame, config: VisualizationsConfig):
     xlabel = df["x_label"].iloc[0]
     if config.metric_name == "speed":
         ylabel = f"Speed Gain Multiplier of Liger over Hugging Face"
+        exit()
     else:
-        ylabel = f"Memory Efficiency Ratio of Liger over Hugging Face"
+        ylabel = f"Memory Cost (Lower is better)"
 
     # Pivot the dataframe to have separate columns for liger and huggingface
     df_pivot = df.pivot(index="x_value", columns="kernel_provider", values="y_value_50")
 
     # Calculate the multiple of liger over huggingface
     if config.metric_name == "speed":
-        df_pivot["multiple"] = df_pivot["huggingface"] / df_pivot["liger"]
+        # df_pivot["multiple"] = df_pivot["huggingface"] / df_pivot["liger"]
+        pass
     else:
-        df_pivot["multiple"] = df_pivot["liger"] / df_pivot["huggingface"]
+        df_pivot["multiple"] = df_pivot["huggingface"] / df_pivot["liger"]
 
     plt.figure(figsize=(12, 6))
     sns.set(style="whitegrid")
@@ -139,20 +141,20 @@ def plot_data(df: pd.DataFrame, config: VisualizationsConfig):
     for i, v in enumerate(df_pivot["multiple"]):
         ax.text(i, v, f"{v:.2f}x", ha="center", va="bottom")
 
-    plt.axhline(y=1, color="r", linestyle="--", label="Baseline (Hugging Face)", linewidth=3)
+    plt.axhline(y=1, color="r", linestyle="--", label="Baseline (Liger)", linewidth=3)
 
     plt.legend()
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(
-        f"{ylabel}: {config.kernel_name} - {config.metric_name} - {config.kernel_operation_mode}"
+        f"Memory Cost of Hugging Face over Liger: {config.kernel_name} - {config.metric_name} - {config.kernel_operation_mode}"
     )
     plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
 
     out_path = os.path.join(
         VISUALIZATIONS_PATH,
-        f"{config.kernel_name}_{config.metric_name}_{config.kernel_operation_mode}_{config.gpu_name}_multiple_gain.png",
+        f"{config.kernel_name}_{config.metric_name}_{config.kernel_operation_mode}_{config.gpu_name}_multiple_memory_cost.png",
     )
 
     if config.display:
