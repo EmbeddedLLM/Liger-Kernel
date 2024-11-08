@@ -6,6 +6,7 @@ import torch
 import transformers
 from accelerate.utils.constants import FSDP_SHARDING_STRATEGY
 from transformers import TrainerControl, TrainerState, TrainingArguments
+import logging
 
 # https://simple.wikipedia.org/wiki/Byte
 # For memory, we use binary system
@@ -121,6 +122,7 @@ class EfficiencyCallback(transformers.TrainerCallback):
         n_decimal_memory=2,
         n_decimal_TPS=2,
         n_decimal_MFU=4,
+        log_file="./logs/logs.log"
     ):
         self.state = State(
             n_warmup_steps,
@@ -137,6 +139,15 @@ class EfficiencyCallback(transformers.TrainerCallback):
         self.memory = Memory()
         self.tps = TPS()
         self.mfu = MFU()
+        
+        # Set up logging
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
 
     def on_init_end(
         self,
@@ -185,6 +196,11 @@ class EfficiencyCallback(transformers.TrainerCallback):
             logs.update(self.memory.__dict__)
             logs.update(self.tps.__dict__)
             # logs.update(self.mfu.__dict__)
+            
+            # Log the information
+            log_message = f"Step {state.global_step}: "
+            log_message += ", ".join([f"{k}: {v}" for k, v in logs.items()])
+            self.logger.info(log_message)
 
     def on_step_begin(
         self,
@@ -382,8 +398,10 @@ class EfficiencyCallback(transformers.TrainerCallback):
             raise Exception(f"Precision bits {precision_bits} is not supported")
 
         device_name = torch.cuda.get_device_name()
-
-        if "A100" in device_name:
+        if "MI300X" in device_name:
+            # data from AMD's specifications
+            return 383 if precision_bits == 16 else 192
+        elif "A100" in device_name:
             # data from https://www.nvidia.com/en-us/data-center/a100/
             return 312 if precision_bits == 16 else 156
         elif "H100" in device_name:
