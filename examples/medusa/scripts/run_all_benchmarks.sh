@@ -19,8 +19,8 @@ export MASTER_ADDR="localhost"
 export MASTER_PORT="18800"
 
 # Define the parameter arrays
-medusa_only_heads=(True False)
-# medusa_only_heads=(False)
+# medusa_only_heads=(True False)
+medusa_only_heads=(False)
 use_liger=(True False)
 # use_liger=(False)
 MEDUSA_NUM_HEADS=(3 5)
@@ -70,7 +70,8 @@ for moh in "${medusa_only_heads[@]}"; do
           --medusa_lr_multiplier $MEDUSA_LR_MULTIPLIER \
           --medusa_only_heads $moh \
           --medusa_return True \
-          --use_liger $ul
+          --use_liger $ul \
+          --torch_compile False
 
         echo "Completed run with parameters:"
         echo "medusa_only_heads: $moh"

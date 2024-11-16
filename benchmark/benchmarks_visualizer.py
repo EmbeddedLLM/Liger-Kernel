@@ -82,7 +82,8 @@ def load_data(config: VisualizationsConfig) -> pd.DataFrame:
     """
     df = pd.read_csv(DATA_PATH)
     df["extra_benchmark_config"] = df["extra_benchmark_config_str"].apply(json.loads)
-
+    unique_values = df["kernel_name"].unique()
+    print(unique_values)
     filtered_df = df[
         (df["kernel_name"] == config.kernel_name)
         & (df["metric_name"] == config.metric_name)
@@ -119,7 +120,7 @@ def plot_data(df: pd.DataFrame, config: VisualizationsConfig):
         hue="kernel_provider",
         marker="o",
         palette="tab10",
-        errorbar=("ci", None),
+        # errorbar=("ci", None),
     )
 
     # Seaborn can't plot pre-computed error bars, so we need to do it manually

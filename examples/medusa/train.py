@@ -110,6 +110,10 @@ class TrainingArguments(transformers.TrainingArguments):
         default=False,
         metadata={"help": "If apply liger kernel to the model."},
     )
+    torch_compile: bool = field(
+        default=False,
+        metadata={"help": "If enable torch.compile"},
+    )
 
 
 local_rank = None
@@ -341,10 +345,19 @@ def train():
     if training_args.use_liger is True:
         apply_liger_kernel_to_llama()
 
-    # Freeze the base model
-    for param in model.base_model.parameters():
-        param.requires_grad = False
+    if training_args.medusa_only_heads:
+        # Freeze the base model
+        for param in model.base_model.parameters():
+            param.requires_grad = False
 
+    requires_grad = []
+    for name, param in model.base_model.named_parameters(recurse=True):
+        if param.requires_grad:
+            requires_grad.append(f"{name}: {param.requires_grad}")
+    if len(requires_grad) == 0:
+        print("there are no parameters that require gradient updates")
+    print(requires_grad)
+    # exit()
     add_medusa_heads(
         model,
         training_args.medusa_num_heads,
@@ -353,8 +366,15 @@ def train():
         training_args.medusa_only_heads,
         training_args.use_liger,
     )
+    
     # Format output dir
     training_args.output_dir = f"{training_args.output_dir}_medusa_mlp_{model_args.model_name_or_path.split('/')[-1]}_medusa_{training_args.medusa_num_heads}_lr_{training_args.learning_rate}_layers_{training_args.medusa_num_layers}"
+
+    if not os.path.exists(training_args.output_dir):
+        os.makedirs(training_args.output_dir)
+
+    # Logfile path
+    log_file_path = os.path.join(training_args.output_dir, "training.log")
 
     # Load data
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
@@ -364,7 +384,7 @@ def train():
         model=model,
         tokenizer=tokenizer,
         args=training_args,
-        callbacks=[EfficiencyCallback()],
+        callbacks=[EfficiencyCallback(log_file=log_file_path)],
         **data_module,
     )
 
